@@ -52,14 +52,26 @@ public class ColdChainRealm extends AuthorizingRealm {
                 CcConstants.PERM_PRICE_ADJUST_APPLY,
                 CcConstants.PERM_QUOTE_VIEW,
                 // V9：调度可查看隔离队列（运维监控）
-                CcConstants.PERM_DEVICE_QUARANTINE_VIEW)));
+                CcConstants.PERM_DEVICE_QUARANTINE_VIEW,
+                // V10：调度维护送达时窗台账查看、装车登记、改期申请、待办确认、承运通知重试
+                CcConstants.PERM_WINDOW_VIEW,
+                CcConstants.PERM_BATCH_LOAD,
+                CcConstants.PERM_RESCHEDULE_APPLY,
+                CcConstants.PERM_RESCHEDULE_TODO,
+                CcConstants.PERM_CARRIER_NOTIFY_RETRY)));
         // 承运岗：温度超限/延误的处置岗位，可确认异常与提交处置结论；
         // V8：承运商并行提交报价
         put("carrier", 3L, "carrier123", "CARRIER", new LinkedHashSet<>(Arrays.asList(
                 CcConstants.PERM_EXCEPTION_CONFIRM,
                 CcConstants.PERM_EXCEPTION_CONCLUDE,
                 CcConstants.PERM_QUOTE_SUBMIT,
-                CcConstants.PERM_QUOTE_VIEW)));
+                CcConstants.PERM_QUOTE_VIEW,
+                // V10：承运装车登记、改期申请、本岗待办确认、承运通知重试
+                CcConstants.PERM_WINDOW_VIEW,
+                CcConstants.PERM_BATCH_LOAD,
+                CcConstants.PERM_RESCHEDULE_APPLY,
+                CcConstants.PERM_RESCHEDULE_TODO,
+                CcConstants.PERM_CARRIER_NOTIFY_RETRY)));
         put("receiver", 4L, "receiver123", "RECEIVER",
                 new LinkedHashSet<>(Arrays.asList(
                         CcConstants.PERM_ALERT_VIEW,
@@ -67,7 +79,10 @@ public class ColdChainRealm extends AuthorizingRealm {
                         CcConstants.PERM_EXCEPTION_CONFIRM,
                         CcConstants.PERM_EXCEPTION_CONCLUDE,
                         // V8：可查看报价/锁价台账（无报价/锁价操作权）
-                        CcConstants.PERM_QUOTE_VIEW)));
+                        CcConstants.PERM_QUOTE_VIEW,
+                        // V10：收货岗查看时窗、确认本岗收货待办
+                        CcConstants.PERM_WINDOW_VIEW,
+                        CcConstants.PERM_RESCHEDULE_TODO)));
         // 管理员：冷链温控预警查看/导出/闭环/扫描 + 类别模板维护 + V6 异常分级全套（不含 QA 复核角色）
         // V9：设备证书管理 + 隔离队列查看 + 重放
         put("admin", 5L, "admin123", "ADMIN", new LinkedHashSet<>(Arrays.asList(
@@ -91,7 +106,11 @@ public class ColdChainRealm extends AuthorizingRealm {
                 CcConstants.PERM_ALERT_VIEW,
                 CcConstants.PERM_EXCEPTION_REVIEW,
                 CcConstants.PERM_PRICE_ADJUST_REVIEW,
-                CcConstants.PERM_QUOTE_VIEW)));
+                CcConstants.PERM_QUOTE_VIEW,
+                // V10：装车后改期由质量/审批岗复核；可查看时窗台账、确认本岗待办
+                CcConstants.PERM_WINDOW_VIEW,
+                CcConstants.PERM_RESCHEDULE_REVIEW,
+                CcConstants.PERM_RESCHEDULE_TODO)));
         // V7 监管岗：按批次抽检（立项/封存/双人转移/结论）+ 抽检台账导出 + 冷链运输审批；
         // 具体能访问哪些监管区域由 t_cc_inspector_region 授权（EAST/NORTH），查询再按区域隔离；
         // V8：可查看承运商报价/锁价台账（无业务操作权）
@@ -100,12 +119,16 @@ public class ColdChainRealm extends AuthorizingRealm {
                 CcConstants.PERM_INSPECTION_MANAGE,
                 CcConstants.PERM_INSPECTION_EXPORT,
                 CcConstants.PERM_APPROVAL_REVIEW,
-                CcConstants.PERM_QUOTE_VIEW)));
+                CcConstants.PERM_QUOTE_VIEW,
+                // V10：监管可查看送达时窗/改期台账（历史版本追查）
+                CcConstants.PERM_WINDOW_VIEW)));
         // V7 第二个监管账号：仅授权 SOUTH 区域（用于跨区域隔离验收），无运输审批权
         put("inspector2", 8L, "inspector123", "INSPECTOR", new LinkedHashSet<>(Arrays.asList(
                 CcConstants.PERM_INSPECTION_VIEW,
                 CcConstants.PERM_INSPECTION_MANAGE,
-                CcConstants.PERM_QUOTE_VIEW)));
+                CcConstants.PERM_QUOTE_VIEW,
+                // V10：监管可查看送达时窗/改期台账
+                CcConstants.PERM_WINDOW_VIEW)));
         // V9 车载设备网关账号：仅设备温度数据上报权限
         put("device", 9L, "device123", "DEVICE", new LinkedHashSet<>(Arrays.asList(
                 CcConstants.PERM_DEVICE_INGEST)));

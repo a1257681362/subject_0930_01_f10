@@ -48,9 +48,11 @@ public class ApprovalService {
         if (CcConstants.BATCH_REVOKED.equals(batch.getStatus())) {
             throw new BusinessException("批次已撤回作废，不能发起运输审批: " + batch.getBatchNo());
         }
-        if (!CcConstants.BATCH_DISPATCHED.equals(batch.getStatus())) {
+        if (!CcConstants.BATCH_DISPATCHED.equals(batch.getStatus())
+                && !CcConstants.BATCH_LOADING.equals(batch.getStatus())) {
             throw new BusinessException(String.format(
-                    "仅已派车未发运的批次需要运输审批，批次 %s 当前状态=%s", batch.getBatchNo(), batch.getStatus()));
+                    "仅已派车未发运（含已装车）的批次需要运输审批，批次 %s 当前状态=%s",
+                    batch.getBatchNo(), batch.getStatus()));
         }
         InspectionApproval latest = latestByBatch(batch.getId());
         if (latest != null && CcConstants.APPROVAL_PENDING.equals(latest.getStatus())) {

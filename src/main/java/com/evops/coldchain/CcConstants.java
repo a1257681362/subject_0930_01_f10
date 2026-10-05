@@ -34,6 +34,8 @@ public final class CcConstants {
 
     // 运输批次状态
     public static final String BATCH_DISPATCHED = "DISPATCHED";
+    /** V10：已装车（派车之后、发运之前的节点；该状态起改期必须审批） */
+    public static final String BATCH_LOADING = "LOADING";
     public static final String BATCH_SHIPPED = "SHIPPED";
     public static final String BATCH_EXCEPTION = "EXCEPTION";
     public static final String BATCH_SIGNED = "SIGNED";
@@ -380,4 +382,70 @@ public final class CcConstants {
     public static final String PERM_DEVICE_QUARANTINE_VIEW = "coldchain:device:quarantine:view";
     /** 重放隔离数据 */
     public static final String PERM_DEVICE_REPLAY = "coldchain:device:replay";
+
+    // —— V10 送达时窗管理 ——
+    /** 时窗规则草稿/发布状态复用 DRAFT / EFFECTIVE / SUPERSEDED */
+    public static final String WINDOW_DRAFT = "DRAFT";
+
+    /** 节假日规则类别：HOLIDAY 节假日（整日闭馆）/ CLOSED 临时闭馆 */
+    public static final String HOLIDAY_HOLIDAY = "HOLIDAY";
+    public static final String HOLIDAY_CLOSED = "CLOSED";
+    /** 节假日/临时闭馆规则状态：ACTIVE 生效中 / VOID 已作废（冻结行不能作废） */
+    public static final String HOLIDAY_ACTIVE = "ACTIVE";
+    public static final String HOLIDAY_VOID = "VOID";
+
+    /** 改期单状态：AUTO 未装车直接生效 / PENDING 装车后待审批 / APPROVED 同意已生效 / REJECTED 驳回未生效 */
+    public static final String RESCHEDULE_AUTO = "AUTO";
+    public static final String RESCHEDULE_PENDING = "PENDING";
+    public static final String RESCHEDULE_APPROVED = "APPROVED";
+    public static final String RESCHEDULE_REJECTED = "REJECTED";
+
+    /** 受影响明细类型：温控区间 / 承运通知对象 / 待办责任人 */
+    public static final String IMPACT_TEMP_ZONE = "TEMP_ZONE";
+    public static final String IMPACT_CARRIER_NOTICE = "CARRIER_NOTICE";
+    public static final String IMPACT_TODO_OWNER = "TODO_OWNER";
+
+    /** 承运通知渠道 / 结果（复用 V6 NOTIFY_CHANNEL_SITE/WEBHOOK 与 NOTIFY_SUCCESS/FAILED） */
+    /** 待办状态：PENDING / DONE 已确认 */
+    public static final String TODO_PENDING = "PENDING";
+    public static final String TODO_DONE = "DONE";
+
+    // V10 操作日志实体类型
+    public static final String ENT_RECEIVE_ORG = "RECEIVE_ORG";
+    public static final String ENT_WINDOW_RULE = "DELIVERY_WINDOW_RULE";
+    public static final String ENT_HOLIDAY = "HOLIDAY_RULE";
+    public static final String ENT_RESCHEDULE = "BATCH_RESCHEDULE";
+
+    // V10 操作动作
+    public static final String ACT_RECEIVE_ORG_CREATE = "RECEIVE_ORG_CREATE";
+    public static final String ACT_RECEIVE_ORG_CHANGE = "RECEIVE_ORG_CHANGE";
+    public static final String ACT_WINDOW_DRAFT = "WINDOW_RULE_DRAFT";
+    public static final String ACT_WINDOW_PUBLISH = "WINDOW_RULE_PUBLISH";
+    public static final String ACT_HOLIDAY_ADD = "HOLIDAY_RULE_ADD";
+    public static final String ACT_HOLIDAY_VOID = "HOLIDAY_RULE_VOID";
+    public static final String ACT_BATCH_LOAD = "BATCH_LOAD";
+    public static final String ACT_BATCH_RESCHEDULE = "BATCH_RESCHEDULE";
+    public static final String ACT_RESCHEDULE_APPROVE = "RESCHEDULE_APPROVE";
+    public static final String ACT_RESCHEDULE_REJECT = "RESCHEDULE_REJECT";
+    public static final String ACT_CARRIER_NOTIFY = "CARRIER_NOTIFY";
+    public static final String ACT_CARRIER_NOTIFY_RETRY = "CARRIER_NOTIFY_RETRY";
+    public static final String ACT_TODO_CONFIRM = "RESCHEDULE_TODO_CONFIRM";
+
+    // —— V10 Shiro 权限点 ——
+    /** 收货机构与时窗规则（工作日区间/版本发布）维护 */
+    public static final String PERM_WINDOW_MANAGE = "coldchain:window:manage";
+    /** 节假日与临时闭馆规则独立维护 */
+    public static final String PERM_HOLIDAY_MANAGE = "coldchain:holiday:manage";
+    /** 送达时窗/改期台账只读查看 */
+    public static final String PERM_WINDOW_VIEW = "coldchain:window:view";
+    /** 运输批次改期申请（未装车直接生效，装车后提交审批） */
+    public static final String PERM_RESCHEDULE_APPLY = "coldchain:reschedule:apply";
+    /** 装车后改期审批 */
+    public static final String PERM_RESCHEDULE_REVIEW = "coldchain:reschedule:review";
+    /** 批次装车登记 */
+    public static final String PERM_BATCH_LOAD = "coldchain:batch:load";
+    /** 承运通知重试 */
+    public static final String PERM_CARRIER_NOTIFY_RETRY = "coldchain:carrier:notify:retry";
+    /** 改期待办确认 */
+    public static final String PERM_RESCHEDULE_TODO = "coldchain:reschedule:todo";
 }

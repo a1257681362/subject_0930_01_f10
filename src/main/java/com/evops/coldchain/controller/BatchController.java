@@ -13,6 +13,7 @@ import com.evops.coldchain.entity.ExceptionEvent;
 import com.evops.coldchain.entity.ExceptionEvidence;
 import com.evops.coldchain.entity.TemperatureLog;
 import com.evops.coldchain.entity.TransportBatch;
+import com.evops.coldchain.service.BatchRescheduleService;
 import com.evops.coldchain.service.LedgerService;
 import com.evops.coldchain.service.TransportBatchService;
 import com.evops.common.ApiResponse;
@@ -36,10 +37,13 @@ public class BatchController {
 
     private final TransportBatchService batchService;
     private final LedgerService ledgerService;
+    private final BatchRescheduleService rescheduleService;
 
-    public BatchController(TransportBatchService batchService, LedgerService ledgerService) {
+    public BatchController(TransportBatchService batchService, LedgerService ledgerService,
+                           BatchRescheduleService rescheduleService) {
         this.batchService = batchService;
         this.ledgerService = ledgerService;
+        this.rescheduleService = rescheduleService;
     }
 
     /** 派车：生成批次号 + 固化档案快照 */
@@ -52,6 +56,12 @@ public class BatchController {
     @PostMapping("/{id}/ship")
     public ApiResponse<TransportBatch> ship(@PathVariable("id") Long id) {
         return ApiResponse.ok(batchService.ship(id));
+    }
+
+    /** V10 装车登记：已派车 -> 已装车（进入该状态后改期必须审批） */
+    @PostMapping("/{id}/loading")
+    public ApiResponse<TransportBatch> loading(@PathVariable("id") Long id) {
+        return ApiResponse.ok(rescheduleService.markLoading(id));
     }
 
     /** 途中温度上报（按时间留痕，越限自动追加异常） */

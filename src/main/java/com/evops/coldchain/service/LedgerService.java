@@ -81,6 +81,8 @@ public class LedgerService {
     private com.evops.coldchain.mapper.InspectionApprovalMapper inspectionApprovalMapper;
     @Resource
     private com.evops.coldchain.service.LockedPriceService lockedPriceService;
+    @Resource
+    private com.evops.coldchain.service.BatchRescheduleService rescheduleService;
 
     public Map<String, Object> batchLedger(Long batchId) {
         TransportBatch batch = batchMapper.selectById(batchId);
@@ -245,6 +247,24 @@ public class LedgerService {
         if (batch.getLockedPriceId() != null) {
             ledger.put("lockedPrice", lockedPriceService.trace(batch.getLockedPriceId()));
         }
+
+        // V10 送达时窗：承诺/预计到达 + 解析所用规则版本/节假日集 + 改期历史（受影响/通知/待办）
+        Map<String, Object> deliveryWindow = new LinkedHashMap<>();
+        deliveryWindow.put("loadingTime", batch.getLoadingTime());
+        deliveryWindow.put("committedArrivalTime", batch.getCommittedArrivalTime());
+        deliveryWindow.put("estimatedArrivalTime", batch.getEstimatedArrivalTime());
+        deliveryWindow.put("windowRuleId", batch.getWindowRuleId());
+        deliveryWindow.put("windowRuleVersionNo", batch.getWindowRuleVersionNo());
+        deliveryWindow.put("windowHolidayIdsSnap", batch.getWindowHolidayIdsSnap());
+        deliveryWindow.put("committedImmutable", true);
+        List<com.evops.coldchain.entity.BatchReschedule> reschedules =
+                rescheduleService.listByBatch(batchId);
+        List<Map<String, Object>> rescheduleList = new ArrayList<>();
+        for (com.evops.coldchain.entity.BatchReschedule rs : reschedules) {
+            rescheduleList.add(rescheduleService.detail(rs.getId()));
+        }
+        deliveryWindow.put("reschedules", rescheduleList);
+        ledger.put("deliveryWindow", deliveryWindow);
 
         ledger.put("opLogs", opLogs);
         return ledger;

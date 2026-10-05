@@ -48,4 +48,10 @@ public interface SequenceMapper {
 
     @Select("SELECT NEXT VALUE FOR seq_cc_locked_price_no")
     Long nextLockedPriceNo();
+
+    @Select("SELECT NEXT VALUE FOR seq_cc_receive_org_no")
+    Long nextReceiveOrgNo();
+
+    @Select("SELECT NEXT VALUE FOR seq_cc_reschedule_no")
+    Long nextRescheduleNo();
 }

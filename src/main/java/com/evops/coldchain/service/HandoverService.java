@@ -486,9 +486,11 @@ public class HandoverService {
         if (CcConstants.BATCH_SIGNED.equals(batch.getStatus())) {
             throw new BusinessException("批次已签收闭环，不能再办理分仓交接: " + batch.getBatchNo());
         }
-        if (CcConstants.BATCH_DISPATCHED.equals(batch.getStatus())) {
+        if (CcConstants.BATCH_DISPATCHED.equals(batch.getStatus())
+                || CcConstants.BATCH_LOADING.equals(batch.getStatus())) {
             throw new BusinessException(String.format(
-                    "批次 %s 尚未发运在途，不能办理到仓/分仓交接", batch.getBatchNo()));
+                    "批次 %s 尚未发运在途（当前=%s），不能办理到仓/分仓交接",
+                    batch.getBatchNo(), batch.getStatus()));
         }
         // 允许 SHIPPED / EXCEPTION（曾越限挂起）批次办理交接
         return batch;

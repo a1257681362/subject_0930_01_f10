@@ -87,6 +87,10 @@ public class TransportBatchService {
     private LockedPriceService lockedPriceService;
     @Resource
     private OpLogService opLogService;
+    @Resource
+    private DeliveryWindowService deliveryWindowService;
+    @Resource
+    private BatchRescheduleService batchRescheduleService;
 
     /** 派车：生成稳定批次号，固化档案快照，关联发货单与车辆 */
     @Transactional
@@ -146,6 +150,30 @@ public class TransportBatchService {
             batchMapper.updateById(batch);
         }
 
+        // V10 送达时窗：收货机构已建档并发布时窗规则时，按计划发运+运输时长解析"承诺到达时间"
+        // 并随批次固化（采用的规则版本/节假日集一并留锚）；承诺只写这一次，此后任何改期都不改写。
+        // 未建档时窗的收货机构保持既有流程（承诺/预计列为空），不阻断派车。
+        String windowDesc = "";
+        com.evops.coldchain.entity.ReceiveOrg receiveOrg = deliveryWindowService.findByName(order.getReceiverOrg());
+        if (receiveOrg != null) {
+            DeliveryWindowService.WindowResolution resolution =
+                    deliveryWindowService.resolveEta(receiveOrg, order.getPlanShipTime());
+            batch.setCommittedArrivalTime(resolution.getEta());
+            batch.setEstimatedArrivalTime(resolution.getEta()); // 初始预计=承诺，改期只动预计
+            batch.setWindowRuleId(resolution.getRuleId());
+            batch.setWindowRuleVersionNo(resolution.getRuleVersionNo());
+            String holidaySnap = resolution.getAppliedHolidayIds().isEmpty() ? null
+                    : resolution.getAppliedHolidayIds().stream()
+                            .map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
+            batch.setWindowHolidayIdsSnap(holidaySnap);
+            batchMapper.updateById(batch);
+            // 参与本承诺结论的节假日/临时闭馆规则当场冻结：旧结论此后不可改动
+            deliveryWindowService.freezeHolidays(resolution.getAppliedHolidayIds(), batch.getId());
+            windowDesc = String.format("；承诺/预计到达=%s（按 %s 时窗 V%d、运输时长%d分钟解析并固化，节假日规则%d条参与，承诺时间不改写）",
+                    resolution.getEta(), receiveOrg.getOrgName(), resolution.getRuleVersionNo(),
+                    receiveOrg.getTransportMinutes(), resolution.getAppliedHolidayIds().size());
+        }
+
         // 发货单同步为已派车
         order.setStatus(CcConstants.ORDER_DISPATCHED);
         orderMapper.updateById(order);
@@ -162,21 +190,26 @@ public class TransportBatchService {
                         lockedPrice == null ? ""
                                 : String.format("；引用锁价单 %s（承运商=%s，含税总价=%s，可经锁价单反查原报价）",
                                         lockedPrice.getLockedPriceNo(), lockedPrice.getCarrierNameSnap(),
-                                        lockedPrice.getFinalTotalAmount())));
+                                        lockedPrice.getFinalTotalAmount()))
+                        + windowDesc);
         return batch;
     }
 
-    /** 发运：已派车 -> 在途；发运瞬间选定路线季节生效版本并逐段固化快照 */
+    /** 发运：已派车（含已装车 LOADING）-> 在途；发运瞬间选定路线季节生效版本并逐段固化快照 */
     @Transactional
     public TransportBatch ship(Long batchId) {
         TransportBatch batch = requireActiveBatch(batchId);
-        if (!CcConstants.BATCH_DISPATCHED.equals(batch.getStatus())) {
-            throw new BusinessException("仅已派车批次允许发运，当前状态: " + batch.getStatus());
+        if (!CcConstants.BATCH_DISPATCHED.equals(batch.getStatus())
+                && !CcConstants.BATCH_LOADING.equals(batch.getStatus())) {
+            throw new BusinessException("仅已派车/已装车批次允许发运，当前状态: " + batch.getStatus());
         }
 
         // V7 冷链运输审批卡口：发起过审批的批次，只完成一半（PENDING）停留待处理、
         // 已驳回（REJECTED）均不得发运；审批同意（APPROVED）才放行。未发起审批不受此卡口约束。
         approvalService.requireApprovedForShip(batchId);
+
+        // V10 改期卡口：装车后改期单停留待审批（PENDING）时不得发运，先同意或驳回
+        batchRescheduleService.requireNoPending(batchId);
 
         // 发运前卡口：车辆必须绑定仍在有效期内的持证探头（接口与页面共用这一道校验）
         VehicleProbe probeBinding = probeService.requireValidBindingForShip(batch.getVehicleId());
@@ -249,6 +282,7 @@ public class TransportBatchService {
             throw new BusinessException("批次已签收闭环，不能再上报温度");
         }
         if (!CcConstants.BATCH_DISPATCHED.equals(batch.getStatus())
+                && !CcConstants.BATCH_LOADING.equals(batch.getStatus())
                 && !CcConstants.BATCH_SHIPPED.equals(batch.getStatus())
                 && !CcConstants.BATCH_EXCEPTION.equals(batch.getStatus())) {
             throw new BusinessException("批次当前状态不允许上报温度: " + batch.getStatus());
@@ -504,7 +538,8 @@ public class TransportBatchService {
         if (CcConstants.BATCH_SIGNED.equals(batch.getStatus())) {
             throw new BusinessException("批次已签收闭环，不能再登记收货拒签");
         }
-        if (CcConstants.BATCH_DISPATCHED.equals(batch.getStatus())) {
+        if (CcConstants.BATCH_DISPATCHED.equals(batch.getStatus())
+                || CcConstants.BATCH_LOADING.equals(batch.getStatus())) {
             throw new BusinessException("批次尚未发运在途，不能登记收货拒签");
         }
         LocalDateTime now = LocalDateTime.now();
@@ -560,6 +595,8 @@ public class TransportBatchService {
 
         // 冷链药品运输权限被收紧时，交接/继续派送停止推进（已确认的封签核验事实保留）
         permissionService.requirePermitted(CcConstants.PERM_COLD_CHAIN_HANDOVER);
+        // V10：装车后改期单停留待审批（PENDING）时，送达时刻未定，不得签收闭环
+        batchRescheduleService.requireNoPending(batch.getId());
         // 已进入分仓交接流程的批次：全部箱子封签核验完成、箱数平衡后方可继续派送/签收；
         // 未走中转仓拆分的直发批次（未登记到仓箱数）不经过此卡口。
         handoverService.requireReadyForDispatchIfStarted(batch.getId());
@@ -625,6 +662,8 @@ public class TransportBatchService {
         if (CcConstants.BATCH_REVOKED.equals(batch.getStatus())) {
             throw new BusinessException("批次已撤回，不能重复撤回");
         }
+        // V10：装车后改期单停留待审批时先完成审批，不允许带着 PENDING 改期单撤回
+        batchRescheduleService.requireNoPending(batch.getId());
         batch.setStatus(CcConstants.BATCH_REVOKED);
         batchMapper.updateById(batch);
 

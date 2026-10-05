@@ -198,6 +198,46 @@ public class ShiroConfig {
         chain.addPathDefinition("/api/cold-chain/device/ingest-batches/**",
                 "authcBasic, perms[" + com.evops.coldchain.CcConstants.PERM_DEVICE_QUARANTINE_VIEW + "]");
 
+        // —— V10 送达时窗管理（写路径在前、宽泛只读在后）——
+        // 收货机构建档
+        chain.addPathDefinition("/api/cold-chain/delivery-windows/orgs/create",
+                "authcBasic, perms[" + com.evops.coldchain.CcConstants.PERM_WINDOW_MANAGE + "]");
+        chain.addPathDefinition("/api/cold-chain/delivery-windows/orgs/*/rules/draft",
+                "authcBasic, perms[" + com.evops.coldchain.CcConstants.PERM_WINDOW_MANAGE + "]");
+        chain.addPathDefinition("/api/cold-chain/delivery-windows/orgs/*/rules/publish",
+                "authcBasic, perms[" + com.evops.coldchain.CcConstants.PERM_WINDOW_MANAGE + "]");
+        chain.addPathDefinition("/api/cold-chain/delivery-windows/orgs/*/holidays/add",
+                "authcBasic, perms[" + com.evops.coldchain.CcConstants.PERM_HOLIDAY_MANAGE + "]");
+        chain.addPathDefinition("/api/cold-chain/delivery-windows/holidays/*/void",
+                "authcBasic, perms[" + com.evops.coldchain.CcConstants.PERM_HOLIDAY_MANAGE + "]");
+        // 只读：机构/版本/区间/节假日历史
+        chain.addPathDefinition("/api/cold-chain/delivery-windows/**",
+                "authcBasic, perms[" + com.evops.coldchain.CcConstants.PERM_WINDOW_VIEW + "]");
+
+        // 装车登记（调度/承运可执行）
+        chain.addPathDefinition("/api/cold-chain/batches/*/loading",
+                "authcBasic, perms[" + com.evops.coldchain.CcConstants.PERM_BATCH_LOAD + "]");
+
+        // 改期：审批/待办确认/通知重试写路径在前
+        chain.addPathDefinition("/api/cold-chain/reschedules/pending",
+                "authcBasic, perms[" + com.evops.coldchain.CcConstants.PERM_RESCHEDULE_REVIEW + "]");
+        chain.addPathDefinition("/api/cold-chain/reschedules/*/approve",
+                "authcBasic, perms[" + com.evops.coldchain.CcConstants.PERM_RESCHEDULE_REVIEW + "]");
+        chain.addPathDefinition("/api/cold-chain/reschedules/*/reject",
+                "authcBasic, perms[" + com.evops.coldchain.CcConstants.PERM_RESCHEDULE_REVIEW + "]");
+        chain.addPathDefinition("/api/cold-chain/reschedules/notifications/*/retry",
+                "authcBasic, perms[" + com.evops.coldchain.CcConstants.PERM_CARRIER_NOTIFY_RETRY + "]");
+        chain.addPathDefinition("/api/cold-chain/reschedules/todos/*/confirm",
+                "authcBasic, perms[" + com.evops.coldchain.CcConstants.PERM_RESCHEDULE_TODO + "]");
+        chain.addPathDefinition("/api/cold-chain/reschedules/todos/pending",
+                "authcBasic, perms[" + com.evops.coldchain.CcConstants.PERM_WINDOW_VIEW + "]");
+        // 改期申请（调度/承运；需在宽泛只读之前）
+        chain.addPathDefinition("/api/cold-chain/reschedules",
+                "authcBasic, perms[" + com.evops.coldchain.CcConstants.PERM_RESCHEDULE_APPLY + "]");
+        // 改期历史/详情只读
+        chain.addPathDefinition("/api/cold-chain/reschedules/**",
+                "authcBasic, perms[" + com.evops.coldchain.CcConstants.PERM_WINDOW_VIEW + "]");
+
         // 冷链台账接口与管理页面使用 HTTP Basic，便于 curl/联调；浏览器会弹出登录框
         chain.addPathDefinition("/api/**", "authcBasic");
         chain.addPathDefinition("/ui/**", "authcBasic");

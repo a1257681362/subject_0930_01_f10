@@ -85,6 +85,19 @@ public class TransportBatch extends BaseEntity {
     // —— V8 承运商报价比选与锁价：派车必须引用一张有效锁价单（反查锚点）——
     private Long lockedPriceId;
 
+    // —— V10 送达时窗：承诺到达（派车固化，永不改）、预计到达（改期只动它）、装车节点与解析版本锚点 ——
+    /** 进入装车状态时间（派车后、发运前；该节点起改期必须审批） */
+    private LocalDateTime loadingTime;
+    /** 承诺到达时间：派车时按当时生效时窗规则解析并固化，只写一次，改期绝不改写 */
+    private LocalDateTime committedArrivalTime;
+    /** 预计到达时间：派车时=承诺时间；每次生效改期按新计划发运重新解析 */
+    private LocalDateTime estimatedArrivalTime;
+    /** 承诺时间解析采用的时窗规则版本ID（历史追查锚点） */
+    private Long windowRuleId;
+    private Integer windowRuleVersionNo;
+    /** 承诺时间解析时参与的节假日/临时闭馆规则ID，逗号分隔（旧结论可追，规则事后冻结） */
+    private String windowHolidayIdsSnap;
+
     public String getBatchNo() { return batchNo; }
     public void setBatchNo(String batchNo) { this.batchNo = batchNo; }
     public Long getOrderId() { return orderId; }
@@ -181,4 +194,18 @@ public class TransportBatch extends BaseEntity {
     public void setInspectionTime(LocalDateTime inspectionTime) { this.inspectionTime = inspectionTime; }
     public Long getLockedPriceId() { return lockedPriceId; }
     public void setLockedPriceId(Long lockedPriceId) { this.lockedPriceId = lockedPriceId; }
+
+    // —— V10：装车节点 + 承诺/预计到达时间 ——
+    public LocalDateTime getLoadingTime() { return loadingTime; }
+    public void setLoadingTime(LocalDateTime loadingTime) { this.loadingTime = loadingTime; }
+    public LocalDateTime getCommittedArrivalTime() { return committedArrivalTime; }
+    public void setCommittedArrivalTime(LocalDateTime committedArrivalTime) { this.committedArrivalTime = committedArrivalTime; }
+    public LocalDateTime getEstimatedArrivalTime() { return estimatedArrivalTime; }
+    public void setEstimatedArrivalTime(LocalDateTime estimatedArrivalTime) { this.estimatedArrivalTime = estimatedArrivalTime; }
+    public Long getWindowRuleId() { return windowRuleId; }
+    public void setWindowRuleId(Long windowRuleId) { this.windowRuleId = windowRuleId; }
+    public Integer getWindowRuleVersionNo() { return windowRuleVersionNo; }
+    public void setWindowRuleVersionNo(Integer windowRuleVersionNo) { this.windowRuleVersionNo = windowRuleVersionNo; }
+    public String getWindowHolidayIdsSnap() { return windowHolidayIdsSnap; }
+    public void setWindowHolidayIdsSnap(String windowHolidayIdsSnap) { this.windowHolidayIdsSnap = windowHolidayIdsSnap; }
 }

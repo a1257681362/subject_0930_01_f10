@@ -820,3 +820,116 @@ Mapper 直查物理表）覆盖：设备证书登记与签名验证通过后的�
 并返回可读错误；重放成功（修复证书后）+ 审计记录 + 已入账不能重复重放；补传不改变已审核
 异常结论（alert_exempt=TRUE，原异常 RESOLVED/APPROVED 不变，无新异常产生）；
 权限校验（401 未认证 / 403 无权限 / 200 正常）。全套 46 个用例通过。
+
+---
+
+## 冷链运输 V10：送达时窗管理
+
+### 核心规则
+
+1. **收货机构按工作日维护可接收区间**：收货机构独立建档（`t_cc_receive_org`，机构名库内唯一，
+   与批次 `receiver_org` 对应），可接收区间挂在时窗规则版本下（`t_cc_delivery_window_rule` +
+   `t_cc_delivery_window_slot`），按星期几（1=周一…7=周日）配置 `HH:mm-HH:mm` 区间，
+   同一工作日区间不得重叠（端点相接允许）。
+2. **规则调整只能生成新版本**：草稿（唯一 DRAFT，可反复编排）→ 发布热替换，旧版本置
+   SUPERSEDED；版本行与工作日区间行发布后永不修改。已派车批次派车时固化规则版本锚点，
+   此后版本热替换不影响老批次的承诺时间。
+3. **节假日与临时闭馆独立保存**：`t_cc_holiday_rule` 与规则版本解耦——HOLIDAY 法定/机构
+   节假日按年按日整日闭馆；CLOSED 临时闭馆支持单日或一段时间。两类规则独立追加，不随版本走。
+4. **承诺 vs 预计到达**：派车时按「计划发运 + 机构默认运输时长」，经当日工作日区间与
+   节假日/闭馆日向后推算出可接收时刻，同时写入 `committed_arrival_time`（承诺）与
+   `estimated_arrival_time`（预计）。承诺只写一次，**任何改期都不改写**；改期只按新计划
+   发运依「当前生效规则」重算预计到达，并逐次追加 `t_cc_batch_reschedule` 历史。
+5. **装车节点**：批次新增 LOADING 状态（派车之后、发运之前）。未装车（DISPATCHED）改期
+   申请即 AUTO 直接生效；**一旦进入装车状态（LOADING，含在途 SHIPPED/异常挂起 EXCEPTION）
+   改期必须审批**：PENDING 期间批次与发货单任何计划字段不变，驳回不变，同意后才应用。
+6. **受影响清单**：每次改期（申请时即列出）逐行记录受影响的**温控区间**（有路线分段快照
+   逐段列出段序号/允许温区/责任人，无路线列全程档案温区）、**承运通知对象**（承运商/驾驶员、
+   关联锁价单）与**待办责任人**（调度/承运/收货，途中曾越限另列质量复核）。
+7. **承运通知与待办**：改期生效后生成承运通知（站内留痕必达；配置 webhook 后失败记原因、
+   可手动重试，每次尝试独立成行、attemptNo 递增）与各岗位待办（PENDING→DONE 只进不退）。
+8. **节假日旧结论冻结**：节假日/临时闭馆规则一旦参与过已生效时窗结论（派车承诺或生效改期
+   ETA 的解析），即 `frozen=TRUE` 并记录首次冻结批次；此后不可修改、不可作废/删除，调整只能
+   新增节假日/闭馆行——规则版本调整同样只能出新版本，不能改动节假日规则旧结论。
+9. **历史版本可追查**：改期单快照解析所用规则版本号、参与的节假日ID集、运输时长、改期前后
+   时刻；批次台账 `/api/cold-chain/batches/{id}/ledger` 聚合 `deliveryWindow`（承诺/预计、
+   版本锚点、全部改期单及其影响/通知/待办）。
+
+### 表结构增量（详见 schema.sql，版本标记 `cold-chain-10`）
+
+- 新增 `t_cc_receive_org`（收货机构主档，指向当前规则版本、默认运输时长）、
+  `t_cc_delivery_window_rule`（规则版本 DRAFT/EFFECTIVE/SUPERSEDED）、
+  `t_cc_delivery_window_slot`（工作日区间，只追加）、
+  `t_cc_holiday_rule`（节假日/临时闭馆，独立保存，frozen 冻结+void 留痕）。
+- 新增 `t_cc_batch_reschedule`（改期单 AUTO/PENDING/APPROVED/REJECTED，版本/节假日/时长快照）、
+  `t_cc_reschedule_impact`（TEMP_ZONE/CARRIER_NOTICE/TODO_OWNER 三类受影响明细）、
+  `t_cc_carrier_notify_log`（承运通知逐次留痕，失败原因+重试）、
+  `t_cc_reschedule_todo`（待办 PENDING/DONE）。
+- `t_cc_transport_batch` 增 `loading_time`、`committed_arrival_time`、`estimated_arrival_time`、
+  `window_rule_id`、`window_rule_version_no`、`window_holiday_ids_snap`。
+
+### 接口增量（仍在 `/api/cold-chain` 下，HTTP Basic）
+
+| 动作 | 方法与路径 | 权限 |
+| --- | --- | --- |
+| 收货机构建档 / 列表 / 详情 | `POST /delivery-windows/orgs/create` · `GET /delivery-windows/orgs[/{id}]` | `coldchain:window:manage` / 查看 |
+| 时窗草稿 / 发布 | `POST /delivery-windows/orgs/{id}/rules/draft` · `/rules/publish` | `coldchain:window:manage` |
+| 版本历史 / 区间 / 当前生效 | `GET /delivery-windows/orgs/{id}/rules` · `/rules/{ruleId}/slots` · `/orgs/{id}/effective` | `coldchain:window:view` |
+| 节假日/闭馆新增 / 列表 / 作废 | `POST /delivery-windows/orgs/{id}/holidays/add` · `GET .../holidays` · `POST /holidays/{id}/void` | `coldchain:holiday:manage` |
+| 批次装车登记 | `POST /batches/{id}/loading` | `coldchain:batch:load` |
+| 改期申请 | `POST /reschedules` | `coldchain:reschedule:apply` |
+| 装车后改期同意 / 驳回 / 待审批列表 | `POST /reschedules/{id}/approve` · `/reject` · `GET /reschedules/pending` | `coldchain:reschedule:review` |
+| 改期详情 / 批次改期历史 | `GET /reschedules/{id}` · `GET /reschedules/batch/{batchId}` | `coldchain:window:view` |
+| 承运通知重试 | `POST /reschedules/notifications/{notifyId}/retry` | `coldchain:carrier:notify:retry` |
+| 待办确认 / 待办列表 | `POST /reschedules/todos/{todoId}/confirm` · `GET /reschedules/todos/pending` | `coldchain:reschedule:todo` / 查看 |
+
+配置项：`coldchain.carrier-notify.endpoint`（为空时承运通知站内留痕必达；配置 webhook 后
+非 2xx 记失败行，可经重试接口重发）。示例（建档 → 工作日区间 → 发布 → 派车 → 装车 → 改期审批）：
+
+```bash
+# 1) 收货机构建档（管理员维护时窗规则；调度/承运/收货/QA 有只读或对应操作权）
+curl -u admin:admin123 -H 'Content-Type: application/json' -X POST \
+  http://localhost:8080/api/cold-chain/delivery-windows/orgs/create -d \
+  '{"orgName":"杭州一院药学部","contactName":"库管主任","transportMinutes":120}'
+
+# 2) 保存工作日区间草稿（周一~周五 08:00-12:00、13:30-17:00）并发布
+curl -u admin:admin123 -H 'Content-Type: application/json' -X POST \
+  http://localhost:8080/api/cold-chain/delivery-windows/orgs/1/rules/draft -d \
+  '{"changeReason":"初版","slots":[
+     {"weekday":1,"startTime":"08:00","endTime":"12:00"},
+     {"weekday":1,"startTime":"13:30","endTime":"17:00"}]}'
+curl -u admin:admin123 -X POST \
+  http://localhost:8080/api/cold-chain/delivery-windows/orgs/1/rules/publish
+
+# 3) 节假日（整日闭馆）与临时闭馆独立保存
+curl -u admin:admin123 -H 'Content-Type: application/json' -X POST \
+  http://localhost:8080/api/cold-chain/delivery-windows/orgs/1/holidays/add -d \
+  '{"ruleKind":"HOLIDAY","holidayDate":"2026-10-09","holidayName":"国庆调休"}'
+
+# 4) 调度派车（承诺/预计到达由时窗解析并固化；见 batches/dispatch，收货机构=杭州一院药学部）
+# 5) 装车登记（此后改期必须审批）
+curl -u dispatcher:dispatcher123 -X POST \
+  http://localhost:8080/api/cold-chain/batches/1/loading
+
+# 6) 装车后改期申请 -> PENDING，响应即含受影响温控区间/承运通知/待办责任人
+curl -u dispatcher:dispatcher123 -H 'Content-Type: application/json' -X POST \
+  http://localhost:8080/api/cold-chain/reschedules -d \
+  '{"batchId":1,"newPlanShipTime":"2026-10-12T09:00:00","reason":"车辆备货延误"}'
+
+# 7) QA 审批同意（驳回则计划/承诺/预计均不变）；同意后承运通知投递、待办生成
+curl -u qa:qa123 -H 'Content-Type: application/json' -X POST \
+  http://localhost:8080/api/cold-chain/reschedules/1/approve -d \
+  '{"reviewNote":"同意按新时刻执行，通知承运与收货安排库位"}'
+```
+
+### V10 验收
+
+`DeliveryWindowRescheduleIntegrationTest`（5 个用例，内存 H2 + 真实 Shiro HTTP Basic，
+Mapper/服务直查物理表）覆盖：工作日区间版本化（草稿重叠拦截、发布热替换、旧版本区间保留、
+老批次锚定旧版承诺不变、新批次按新版）；ETA 解析（工作日区间、周末空档顺延、运输时长）；
+未装车改期 AUTO 直接生效（预计重算、发货单计划同步、承诺不改写、影响/通知/待办生成）；
+节假日与临时闭馆独立维护（参与结论后冻结禁作废、未参与可作废只留状态、非法配置拦截）；
+装车/在途改期必须审批（PENDING 字段不动、驳回不变可重申、同意后应用；温控区间含路线分段
+快照与责任人、承运通知对象、调度/承运/收货待办责任人逐一列出；webhook 失败留痕不回滚、
+重试 attemptNo 递增；待办确认只进不退；签收=送达时窗完成后禁止改期；台账聚合改期历史）；
+权限（401/403/200：时窗维护、装车、改期申请、改期审批分级授权）。全套 51 个用例通过。
