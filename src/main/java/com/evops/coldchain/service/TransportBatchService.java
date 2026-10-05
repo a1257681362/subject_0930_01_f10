@@ -87,7 +87,10 @@ public class TransportBatchService {
     private LockedPriceService lockedPriceService;
     @Resource
     private OpLogService opLogService;
-
+    @Resource
+    private DeliveryWindowService deliveryWindowService;
+    @Resource
+    private BatchRescheduleService rescheduleService;
     /** 派车：生成稳定批次号，固化档案快照，关联发货单与车辆 */
     @Transactional
     public TransportBatch dispatch(DispatchRequest req) {
@@ -138,6 +141,10 @@ public class TransportBatchService {
         batch.setStatus(CcConstants.BATCH_DISPATCHED);
         batchMapper.insert(batch);
 
+        // V10 送达时窗：收货机构已维护时窗的，派车即按计划发运+在途时长对齐可接收区间，
+        // 固化“原承诺送达时间/预计到达/时窗版本”。承诺时间此后任何改期路径都不改写。
+        bindDeliveryWindow(batch, req, order);
+
         // V5 温控预警模板：批次落库拿到ID后，按药品类别解析生效模板（上级继承/本类别覆盖）
         // 逐温区固化快照并命中本批次预警温区；此后类别/模板变更与本批次脱钩，旧批次永远用创建时快照。
         String alertZoneCode = categoryService.snapshotForBatch(batch, version);
@@ -162,8 +169,46 @@ public class TransportBatchService {
                         lockedPrice == null ? ""
                                 : String.format("；引用锁价单 %s（承运商=%s，含税总价=%s，可经锁价单反查原报价）",
                                         lockedPrice.getLockedPriceNo(), lockedPrice.getCarrierNameSnap(),
-                                        lockedPrice.getFinalTotalAmount())));
+                                        lockedPrice.getFinalTotalAmount()))
+                        + (batch.getPromisedArriveTime() == null ? ""
+                                : String.format("；按收货机构 %s 送达时窗 V%d 固化原承诺送达时间=%s（在途 %d 分钟；承诺=初始预计到达，改期只重算预计到达、承诺不改写）",
+                                        batch.getReceiverOrg(), batch.getWindowVersionNo(),
+                                        batch.getPromisedArriveTime(), batch.getTransitMinutes())));
         return batch;
+    }
+
+    /**
+     * V10：派车时固化送达时窗承诺。收货机构已维护时窗的，必须给出在途时长且发货单有计划发运时间，
+     * 按“计划发运 + 在途时长”对齐当时生效工作日区间（遇节假日/临时闭馆顺延），
+     * 把原承诺送达时间、初始预计到达、时窗版本逐字段固化到批次；未维护时窗的机构不生成承诺列，
+     * 保持既有派车口径。
+     */
+    private void bindDeliveryWindow(TransportBatch batch, DispatchRequest req, ShipmentOrder order) {
+        com.evops.coldchain.entity.DeliveryWindow window =
+                deliveryWindowService.findByReceiverOrg(batch.getReceiverOrg());
+        if (window == null) {
+            return;
+        }
+        if (req.getTransitMinutes() == null || req.getTransitMinutes() <= 0) {
+            throw new BusinessException(String.format(
+                    "收货机构 %s 已维护送达时窗，派车必须给出正的预计在途时长 transitMinutes（分钟）",
+                    batch.getReceiverOrg()));
+        }
+        if (order.getPlanShipTime() == null) {
+            throw new BusinessException(String.format(
+                    "收货机构 %s 已维护送达时窗，发货单必须有计划发运时间才能计算承诺送达",
+                    batch.getReceiverOrg()));
+        }
+        LocalDateTime raw = order.getPlanShipTime().plusMinutes(req.getTransitMinutes());
+        DeliveryWindowService.ReceivableResolution r =
+                deliveryWindowService.resolveReceivable(window.getId(), raw);
+        batch.setDeliveryWindowId(window.getId());
+        batch.setWindowVersionId(r.getWindowVersionId());
+        batch.setWindowVersionNo(r.getWindowVersionNo());
+        batch.setTransitMinutes(req.getTransitMinutes());
+        batch.setPromisedArriveTime(r.getReceivableTime());
+        batch.setEstimatedArriveTime(r.getReceivableTime());
+        batchMapper.updateById(batch);
     }
 
     /** 发运：已派车 -> 在途；发运瞬间选定路线季节生效版本并逐段固化快照 */
@@ -177,6 +222,9 @@ public class TransportBatchService {
         // V7 冷链运输审批卡口：发起过审批的批次，只完成一半（PENDING）停留待处理、
         // 已驳回（REJECTED）均不得发运；审批同意（APPROVED）才放行。未发起审批不受此卡口约束。
         approvalService.requireApprovedForShip(batchId);
+
+        // V10 装车后改期卡口：已装车批次改期单只完成一半（PENDING）停留待处理，同意/驳回前不得发运
+        rescheduleService.requireRescheduleClearForShip(batchId);
 
         // 发运前卡口：车辆必须绑定仍在有效期内的持证探头（接口与页面共用这一道校验）
         VehicleProbe probeBinding = probeService.requireValidBindingForShip(batch.getVehicleId());

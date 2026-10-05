@@ -85,6 +85,21 @@ public class TransportBatch extends BaseEntity {
     // —— V8 承运商报价比选与锁价：派车必须引用一张有效锁价单（反查锚点）——
     private Long lockedPriceId;
 
+    // —— V10 送达时窗：派车固化原承诺送达时间与时窗版本；改期只重算预计到达，承诺时间永不改写 ——
+    /** 收货机构送达时窗主档ID（按 receiverOrg 命中） */
+    private Long deliveryWindowId;
+    /** 派车时固化的工作日区间版本ID（此后时窗调整出新版本不影响本字段） */
+    private Long windowVersionId;
+    private Integer windowVersionNo;
+    /** 原承诺送达时间：派车时按在途时长+可接收区间计算后固化，任何改期路径都不改写 */
+    private LocalDateTime promisedArriveTime;
+    /** 预计到达时间：改期重算的唯一落位列；未改期前=承诺时间 */
+    private LocalDateTime estimatedArriveTime;
+    /** 派车登记的预计在途时长（分钟），承诺与每次改期重算均以此为运输时长基准 */
+    private Integer transitMinutes;
+    /** 装车时间：非空=批次已进入装车状态；已装车批次改期必须审批 */
+    private LocalDateTime loadTime;
+
     public String getBatchNo() { return batchNo; }
     public void setBatchNo(String batchNo) { this.batchNo = batchNo; }
     public Long getOrderId() { return orderId; }
@@ -181,4 +196,20 @@ public class TransportBatch extends BaseEntity {
     public void setInspectionTime(LocalDateTime inspectionTime) { this.inspectionTime = inspectionTime; }
     public Long getLockedPriceId() { return lockedPriceId; }
     public void setLockedPriceId(Long lockedPriceId) { this.lockedPriceId = lockedPriceId; }
+
+    // —— V10：送达时窗 ——
+    public Long getDeliveryWindowId() { return deliveryWindowId; }
+    public void setDeliveryWindowId(Long deliveryWindowId) { this.deliveryWindowId = deliveryWindowId; }
+    public Long getWindowVersionId() { return windowVersionId; }
+    public void setWindowVersionId(Long windowVersionId) { this.windowVersionId = windowVersionId; }
+    public Integer getWindowVersionNo() { return windowVersionNo; }
+    public void setWindowVersionNo(Integer windowVersionNo) { this.windowVersionNo = windowVersionNo; }
+    public LocalDateTime getPromisedArriveTime() { return promisedArriveTime; }
+    public void setPromisedArriveTime(LocalDateTime promisedArriveTime) { this.promisedArriveTime = promisedArriveTime; }
+    public LocalDateTime getEstimatedArriveTime() { return estimatedArriveTime; }
+    public void setEstimatedArriveTime(LocalDateTime estimatedArriveTime) { this.estimatedArriveTime = estimatedArriveTime; }
+    public Integer getTransitMinutes() { return transitMinutes; }
+    public void setTransitMinutes(Integer transitMinutes) { this.transitMinutes = transitMinutes; }
+    public LocalDateTime getLoadTime() { return loadTime; }
+    public void setLoadTime(LocalDateTime loadTime) { this.loadTime = loadTime; }
 }

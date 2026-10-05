@@ -23,6 +23,12 @@ public class DispatchRequest {
      * 的锁价单；批次以此作为锁价单反查锚点。
      */
     private Long lockedPriceId;
+    /**
+     * V10 预计在途时长（分钟）：若收货机构已维护送达时窗，派车时按
+     * 计划发运时间 + 在途时长，再对齐该机构可接收区间，固化“原承诺送达时间”。
+     * 收货机构无时窗规则时可不传（不生成承诺/预计到达）。
+     */
+    private Integer transitMinutes;
 
     public Long getOrderId() { return orderId; }
     public void setOrderId(Long orderId) { this.orderId = orderId; }
@@ -34,4 +40,6 @@ public class DispatchRequest {
     public void setSuperviseRegion(String superviseRegion) { this.superviseRegion = superviseRegion; }
     public Long getLockedPriceId() { return lockedPriceId; }
     public void setLockedPriceId(Long lockedPriceId) { this.lockedPriceId = lockedPriceId; }
+    public Integer getTransitMinutes() { return transitMinutes; }
+    public void setTransitMinutes(Integer transitMinutes) { this.transitMinutes = transitMinutes; }
 }

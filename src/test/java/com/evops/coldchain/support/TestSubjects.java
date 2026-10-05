@@ -40,6 +40,24 @@ public class TestSubjects {
         }
     }
 
+    /** 同 {@link #runAs}，但回调允许返回一个值（服务直调需要拿返回实体时使用）。 */
+    public <T> T callAs(long id, String username, java.util.function.Supplier<T> action) {
+        String realmName = resolveRealmName();
+        UserPrincipal principal = new UserPrincipal(id, username);
+        SimplePrincipalCollection principals = new SimplePrincipalCollection(principal, realmName);
+        Subject subject = new Subject.Builder(securityManager)
+                .principals(principals)
+                .authenticated(true)
+                .buildSubject();
+        SubjectThreadState state = new SubjectThreadState(subject);
+        state.bind();
+        try {
+            return action.get();
+        } finally {
+            state.restore();
+        }
+    }
+
     private String resolveRealmName() {
         return ((org.apache.shiro.mgt.RealmSecurityManager) securityManager)
                 .getRealms().iterator().next().getName();

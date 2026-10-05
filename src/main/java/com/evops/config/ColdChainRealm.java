@@ -52,7 +52,10 @@ public class ColdChainRealm extends AuthorizingRealm {
                 CcConstants.PERM_PRICE_ADJUST_APPLY,
                 CcConstants.PERM_QUOTE_VIEW,
                 // V9：调度可查看隔离队列（运维监控）
-                CcConstants.PERM_DEVICE_QUARANTINE_VIEW)));
+                CcConstants.PERM_DEVICE_QUARANTINE_VIEW,
+                // V10：调度维护收货机构送达时窗、登记装车、发起批次改期（装车后改期由监管岗审批）
+                CcConstants.PERM_WINDOW_MANAGE,
+                CcConstants.PERM_BATCH_RESCHEDULE_APPLY)));
         // 承运岗：温度超限/延误的处置岗位，可确认异常与提交处置结论；
         // V8：承运商并行提交报价
         put("carrier", 3L, "carrier123", "CARRIER", new LinkedHashSet<>(Arrays.asList(
@@ -100,6 +103,8 @@ public class ColdChainRealm extends AuthorizingRealm {
                 CcConstants.PERM_INSPECTION_MANAGE,
                 CcConstants.PERM_INSPECTION_EXPORT,
                 CcConstants.PERM_APPROVAL_REVIEW,
+                // V10：已进入装车状态的批次改期必须经审批岗同意后才生效
+                CcConstants.PERM_BATCH_RESCHEDULE_REVIEW,
                 CcConstants.PERM_QUOTE_VIEW)));
         // V7 第二个监管账号：仅授权 SOUTH 区域（用于跨区域隔离验收），无运输审批权
         put("inspector2", 8L, "inspector123", "INSPECTOR", new LinkedHashSet<>(Arrays.asList(

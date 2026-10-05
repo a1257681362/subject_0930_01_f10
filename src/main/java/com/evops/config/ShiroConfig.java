@@ -198,6 +198,30 @@ public class ShiroConfig {
         chain.addPathDefinition("/api/cold-chain/device/ingest-batches/**",
                 "authcBasic, perms[" + com.evops.coldchain.CcConstants.PERM_DEVICE_QUARANTINE_VIEW + "]");
 
+        // —— V10 送达时窗管理（写路径在前；时窗/改期只读路径由末尾 /api/** 兜底为登录可查）——
+        // 建档 / 节假日闭馆作废是 POST 专用路径，直接按维护权限点过滤；
+        // “同一路径 GET 只读 + POST 写”的 versions/calendar 与抽检模块同做法：链不区分方法，
+        // 故其登录校验由 /api/** 兜底，写操作在 DeliveryWindowService 内二次校验维护权限点。
+        chain.addPathDefinition("/api/cold-chain/delivery-windows/create",
+                "authcBasic, perms[" + com.evops.coldchain.CcConstants.PERM_WINDOW_MANAGE + "]");
+        chain.addPathDefinition("/api/cold-chain/delivery-windows/calendar/*/void",
+                "authcBasic, perms[" + com.evops.coldchain.CcConstants.PERM_WINDOW_MANAGE + "]");
+
+        // —— V10 装车与批次改期 ——
+        // 装车登记 / 改期申请 / 承运通知再次发送：调度
+        chain.addPathDefinition("/api/cold-chain/batches/load",
+                "authcBasic, perms[" + com.evops.coldchain.CcConstants.PERM_BATCH_RESCHEDULE_APPLY + "]");
+        chain.addPathDefinition("/api/cold-chain/batches/reschedules",
+                "authcBasic, perms[" + com.evops.coldchain.CcConstants.PERM_BATCH_RESCHEDULE_APPLY + "]");
+        chain.addPathDefinition("/api/cold-chain/batches/reschedules/*/notify-retry",
+                "authcBasic, perms[" + com.evops.coldchain.CcConstants.PERM_BATCH_RESCHEDULE_APPLY + "]");
+        // 已装车批次改期审批（同意/驳回）：审批岗
+        chain.addPathDefinition("/api/cold-chain/batches/reschedules/*/approve",
+                "authcBasic, perms[" + com.evops.coldchain.CcConstants.PERM_BATCH_RESCHEDULE_REVIEW + "]");
+        chain.addPathDefinition("/api/cold-chain/batches/reschedules/*/reject",
+                "authcBasic, perms[" + com.evops.coldchain.CcConstants.PERM_BATCH_RESCHEDULE_REVIEW + "]");
+        // 改期待办办结 / 改期链·预览只读：登录即可（由 /api/** 兜底；服务层不做额外限制）
+
         // 冷链台账接口与管理页面使用 HTTP Basic，便于 curl/联调；浏览器会弹出登录框
         chain.addPathDefinition("/api/**", "authcBasic");
         chain.addPathDefinition("/ui/**", "authcBasic");

@@ -380,4 +380,51 @@ public final class CcConstants {
     public static final String PERM_DEVICE_QUARANTINE_VIEW = "coldchain:device:quarantine:view";
     /** 重放隔离数据 */
     public static final String PERM_DEVICE_REPLAY = "coldchain:device:replay";
+
+    // —— V10 送达时窗管理 ——
+    /** 节假日规则类型：法定/机构节假日 */
+    public static final String CAL_HOLIDAY = "HOLIDAY";
+    /** 节假日规则类型：临时闭馆（盘点/消杀/活动等） */
+    public static final String CAL_TEMP_CLOSED = "TEMP_CLOSED";
+    // 日历规则状态：EFFECTIVE 生效中 / REVOKED 已作废留痕（复用 EFFECTIVE/REVOKED 字面值）
+    /** 改期审批状态：DIRECT 未装车直接生效（无需审批）/ PENDING 已装车待审批 / APPROVED 同意已生效 / REJECTED 驳回未生效 */
+    public static final String RS_DIRECT = "DIRECT";
+    public static final String RS_PENDING = "PENDING";
+    public static final String RS_APPROVED = "APPROVED";
+    public static final String RS_REJECTED = "REJECTED";
+    /** 改期待办状态：OPEN 待办 / DONE 已完成（完成事实只进不退） */
+    public static final String TODO_OPEN = "OPEN";
+    public static final String TODO_DONE = "DONE";
+
+    // V10 操作日志实体类型
+    public static final String ENT_DELIVERY_WINDOW = "DELIVERY_WINDOW";
+    public static final String ENT_RESCHEDULE = "RESCHEDULE";
+
+    // V10 操作动作
+    /** 收货机构送达时窗建档（工作日区间 V1） */
+    public static final String ACT_WINDOW_CREATE = "WINDOW_CREATE";
+    /** 工作日区间规则调整（只追加新版本） */
+    public static final String ACT_WINDOW_CHANGE = "WINDOW_CHANGE";
+    /** 节假日/临时闭馆独立规则新增（与时窗版本脱钩保存） */
+    public static final String ACT_HOLIDAY_ADD = "WINDOW_CALENDAR_ADD";
+    /** 节假日/临时闭馆规则作废留痕（不提供修改/删除） */
+    public static final String ACT_HOLIDAY_VOID = "WINDOW_CALENDAR_VOID";
+    /** 批次进入装车状态 */
+    public static final String ACT_BATCH_LOAD = "BATCH_LOAD";
+    /** 批次改期申请（未装车直接生效 / 已装车停留待审批） */
+    public static final String ACT_RESCHEDULE_APPLY = "RESCHEDULE_APPLY";
+    public static final String ACT_RESCHEDULE_APPROVE = "RESCHEDULE_APPROVE";
+    public static final String ACT_RESCHEDULE_REJECT = "RESCHEDULE_REJECT";
+    /** 改期承运通知发送/重试 */
+    public static final String ACT_RESCHEDULE_NOTIFY = "RESCHEDULE_NOTIFY";
+    /** 改期待办办结 */
+    public static final String ACT_RESCHEDULE_TODO_DONE = "RESCHEDULE_TODO_DONE";
+
+    // —— V10 Shiro 权限点 ——
+    /** 收货机构送达时窗维护（工作日区间版本 + 节假日/临时闭馆独立规则） */
+    public static final String PERM_WINDOW_MANAGE = "coldchain:window:manage";
+    /** 运输批次改期申请（重算预计到达、承诺不改） */
+    public static final String PERM_BATCH_RESCHEDULE_APPLY = "coldchain:batch:reschedule:apply";
+    /** 已装车批次改期审批 */
+    public static final String PERM_BATCH_RESCHEDULE_REVIEW = "coldchain:batch:reschedule:review";
 }
